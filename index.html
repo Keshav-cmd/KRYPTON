@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#111318" />
+<meta name="author" content="Keshav Jha" />
+<title>KRYPTØN — Chess against five AI minds</title>
+<meta name="description" content="KRYPTØN — a complete chess game against five AI bots: NOX, DEEPNIGHT, AXIOM, CAISSA and NEMESIS. By Keshav Jha." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><img src="assets/pieces/wN.svg" alt=""></span>
+      <div class="brand-text">
+        <h1>KRYPT<span class="k-o">Ø</span>N</h1>
+        <p>Five minds, one board — pick your opponent and climb the ladder.</p>
+      </div>
+    </div>
+    <div class="topbar-tools">
+      <span class="match-pill" id="matchPill">AXIOM · 1200 Elo</span>
+      <button class="icon-btn" id="soundBtn" aria-label="Toggle sound" data-tip="Sound"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h3.5L13 19V5L7.5 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <section class="board-column">
+      <div class="board-frame">
+        <div class="evalbar" id="evalBar" data-tip="Engine evaluation" role="img" aria-label="Engine evaluation">
+          <div class="evalbar-fill" id="evalFill"></div>
+          <div class="evalbar-mid"></div>
+          <span class="evalbar-num" id="evalNum">0.0</span>
+        </div>
+        <div class="board-wrap">
+          <div class="board" id="board" role="grid" aria-label="Chess board">
+            <div class="squares" id="squares"></div>
+            <div class="pieces" id="pieces"></div>
+          </div>
+          <div class="promo-layer" id="promoLayer" hidden></div>
+          <div class="modal-layer" id="modalLayer" hidden></div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <span class="turn-dot" id="turnDot"></span>
+        <span class="status-text" id="statusText">White to move</span>
+        <span class="engine-info" id="engineInfo"></span>
+      </div>
+
+      <div class="review-bar" id="reviewBar" hidden>
+        <span>Reviewing <b id="reviewNum">move 1</b></span>
+        <button class="btn btn-sm" id="liveBtn">Back to live</button>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Opponent</h2>
+          <span class="chip" id="eloChip">~1200</span>
+        </div>
+        <div class="levels" id="levels"></div>
+        <p class="blurb" id="levelBlurb"></p>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>You play</h2></div>
+        <div class="segmented" id="colorPick" role="group" aria-label="Choose your colour">
+          <button class="seg" data-color="w">White</button>
+          <button class="seg" data-color="b">Black</button>
+          <button class="seg" data-color="r">Random</button>
+        </div>
+        <div class="btn-grid">
+          <button class="btn btn-primary" id="newGameBtn">New game</button>
+          <button class="btn" id="undoBtn">Undo</button>
+          <button class="btn btn-ai" id="hintBtn" data-tip="Ask the engine">Hint</button>
+          <button class="btn" id="flipBtn">Flip board</button>
+          <button class="btn btn-danger" id="resignBtn">Resign</button>
+          <button class="btn" id="pgnBtn">Copy PGN</button>
+        </div>
+      </section>
+
+      <section class="card card-moves">
+        <div class="card-head">
+          <h2>Moves</h2>
+          <span class="chip" id="moveCount">0</span>
+        </div>
+        <div class="movelist" id="movelist"><p class="empty">No moves yet — make the first one.</p></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Material</h2></div>
+        <div class="captures" id="captures"></div>
+      </section>
+
+    </aside>
+  </main>
+
+  <footer class="app-footer">
+    <span class="credit">
+      <span class="credit-mark" aria-hidden="true"></span>
+      Created by <b>Keshav Jha</b>
+    </span>
+    <span class="footer-note">KRYPTØN · five AI minds</span>
+  </footer>
+</div>
+
+<script src="js/engine.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/app.js"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5c1216f0c233292',t:'MTc5NDk0MzYyMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5c1216f0c233292',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
