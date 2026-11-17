@@ -7,11 +7,11 @@
 **Play chess against five AI opponents in your browser. No sign-up, no install, no engine to configure.**
 
 [![Live demo](https://img.shields.io/badge/live_demo-keshav--cmd.github.io%2FKRYPTON-D8B878?style=flat-square&labelColor=0B0D12)](https://keshav-cmd.github.io/KRYPTON/)
-[![Download APK](https://img.shields.io/badge/download-Android_APK-D72638?style=flat-square&labelColor=0B0D12)](app/KRYPT%C3%98N.apk)
+[![Download APK](https://img.shields.io/badge/download-Android_APK-D72638?style=flat-square&labelColor=0B0D12)](https://github.com/Keshav-cmd/KRYPTON/raw/refs/heads/main/app/KRYPT%C3%98N.apk)
 [![Built with](https://img.shields.io/badge/built_with-HTML_%2B_CSS_%2B_JS-A78BFA?style=flat-square&labelColor=0B0D12)](js/)
 [![No dependencies](https://img.shields.io/badge/dependencies-zero-9299A9?style=flat-square&labelColor=0B0D12)](#how-the-engine-thinks)
 
-[**Play now**](https://keshav-cmd.github.io/KRYPTON/) · [Download the APK](app/KRYPT%C3%98N.apk) · [Screenshots](#screenshots) · [How it works](#how-the-engine-thinks)
+[**Play now**](https://keshav-cmd.github.io/KRYPTON/) · [Download the APK](https://github.com/Keshav-cmd/KRYPTON/raw/refs/heads/main/app/KRYPT%C3%98N.apk) · [Screenshots](#screenshots) · [How it works](#how-the-engine-thinks)
 
 </div>
 
@@ -40,7 +40,7 @@ The project is a from-scratch chess engine — move generation, alpha-beta searc
 
 **[keshav-cmd.github.io/KRYPTON](https://keshav-cmd.github.io/KRYPTON/)** — works in any modern desktop or mobile browser, installs to nothing, and needs no account. Pick an opponent, choose White or Black, and start playing.
 
-Prefer an app icon on your home screen? Grab the Android build: **[`app/KRYPTØN.apk`](app/KRYPT%C3%98N.apk)**.
+Prefer an app icon on your home screen? Grab the Android build: **[`app/KRYPTØN.apk`](https://github.com/Keshav-cmd/KRYPTON/raw/refs/heads/main/app/KRYPT%C3%98N.apk)**.
 
 ## Screenshots
 
@@ -122,9 +122,9 @@ Open **[keshav-cmd.github.io/KRYPTON](https://keshav-cmd.github.io/KRYPTON/)** �
 
 ### Android APK
 
-Download **[`app/KRYPTØN.apk`](app/KRYPT%C3%98N.apk)** and open it on your phone. Android will ask for permission to install from your browser or file manager the first time (*Settings → Install unknown apps*). The same build works offline.
+Download **[`app/KRYPTØN.apk`](https://github.com/Keshav-cmd/KRYPTON/raw/refs/heads/main/app/KRYPT%C3%98N.apk)** and open it on your phone. Android will ask for permission to install from your browser or file manager the first time (*Settings → Install unknown apps*). The same build works offline.
 
-> The repository stores the APK at `app/KRYPTØN.apk`. Because the filename contains `Ø`, links use the percent-encoded path `app/KRYPT%C3%98N.apk`.
+> The repository stores the APK at `app/KRYPTØN.apk`. Because the filename contains `Ø`, links use the percent-encoded path `https://github.com/Keshav-cmd/KRYPTON/raw/refs/heads/main/app/KRYPT%C3%98N.apk`.
 
 ### Run it locally
 
