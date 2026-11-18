@@ -1,0 +1,52 @@
+{
+  "name": "KRYPTØN — Chess against five AI minds",
+  "short_name": "KRYPTØN",
+  "description": "Free AI chess game: five chess engines from 450 to 1900 Elo, written from scratch in JavaScript.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B0D12",
+  "theme_color": "#0B0D12",
+  "icons": [
+    {
+      "src": "assets/logo/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/logo/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/logo/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "lang": "en",
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/01-desktop.png",
+      "sizes": "2560x1800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Playing CAISSA on the desktop board"
+    },
+    {
+      "src": "screenshots/04-mobile.png",
+      "sizes": "828x3062",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "The same game on a phone"
+    }
+  ]
+}

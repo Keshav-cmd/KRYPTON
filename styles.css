@@ -327,9 +327,12 @@ body::before {
 .evalbar-fill {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 50%;
+  height: 100%;
+  transform: scaleY(0.5);
+  transform-origin: bottom center;
+  will-change: transform;
   background: linear-gradient(180deg, var(--gold-150), var(--gold) 55%, var(--gold-500));
-  transition: height .5s cubic-bezier(.22, .8, .3, 1);
+  transition: transform .5s cubic-bezier(.22, .8, .3, 1);
 }
 
 .evalbar-mid {
@@ -462,20 +465,25 @@ body::before {
   top: 0; left: 0;
   width: var(--sq);
   height: var(--sq);
-  padding: 3.5%;
+  /* breathing room only: pieces sit this much inside their square */
+  padding: 2.5%;
   object-fit: contain;
   pointer-events: none;
   transition: transform .19s cubic-bezier(.22, .75, .3, 1);
-  will-change: transform;
   z-index: 2;
-  filter: drop-shadow(0 2px 2px rgba(var(--shadow-rgb), 0.42));
+}
+
+/* Only the black pieces need a shadow, for their light rim against graphite.
+   White pieces have their own dark outline inside the SVG, so paying for 32
+   drop-shadow filters on every animated frame bought nothing. */
+.piece.black {
+  filter: drop-shadow(0 2px 2px rgba(var(--shadow-rgb), 0.40));
 }
 
 /* a fine light rim keeps black pieces legible on graphite squares */
 .piece.black {
   filter:
     drop-shadow(0 0 0.9px rgba(var(--cloud-rgb), 0.85))
-    drop-shadow(0 0 1px rgba(var(--cloud-rgb), 0.5))
     drop-shadow(0 2px 2px rgba(var(--shadow-rgb), 0.45));
 }
 
@@ -768,6 +776,76 @@ body::before {
 }
 
 /* primary -> gold */
+/* player rating — gold, because it is the score you earn */
+.chip-rating {
+  color: var(--gold-text);
+  border-color: var(--gold-line);
+  background: var(--gold-soft);
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  justify-content: center;
+}
+.chip-rating.flash-up { animation: ratingUp .9s ease; }
+.chip-rating.flash-down { animation: ratingDown .9s ease; }
+@keyframes ratingUp {
+  0% { background: rgba(var(--gold-rgb), 0.42); }
+  100% { background: var(--gold-soft); }
+}
+@keyframes ratingDown {
+  0% { background: rgba(var(--crimson-rgb), 0.36); border-color: var(--crimson-line); }
+  100% { background: var(--gold-soft); }
+}
+
+/* the opponent that matches your rating gets a quiet gold pip */
+.level-elo.matched::before {
+  content: "";
+  display: inline-block;
+  width: 5px; height: 5px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  vertical-align: middle;
+}
+
+/* post-game review — markers on the move list */
+.move-san.blunder { color: var(--crimson-text); }
+.move-san.mistake { color: var(--gold-text); }
+.move-san.inaccuracy { color: var(--muted); }
+.move-san.blunder::after,
+.move-san.mistake::after,
+.move-san.inaccuracy::after {
+  content: "";
+  display: inline-block;
+  width: 4px; height: 4px;
+  margin-left: 5px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: currentColor;
+  opacity: .8;
+}
+
+.chip-review {
+  color: var(--violet-text);
+  border-color: var(--violet-line);
+  background: var(--violet-soft);
+  font-variant-numeric: tabular-nums;
+}
+.chip-review[hidden] { display: none; }
+
+/* install button — appears only when the browser says the app can be installed */
+.btn-install {
+  grid-column: 1 / -1;
+  color: var(--gold-text);
+  border-color: var(--gold-line);
+  background: var(--gold-soft);
+  letter-spacing: .01em;
+}
+.btn-install[hidden] { display: none; }
+.btn-install:hover:not(:disabled) {
+  background: rgba(var(--gold-rgb), 0.18);
+  border-color: rgba(var(--gold-rgb), 0.55);
+}
+
 .btn-primary {
   background: linear-gradient(150deg, var(--gold-150) 0%, var(--gold) 48%, var(--gold-400) 100%);
   border-color: rgba(var(--cloud-rgb), 0.22);
@@ -1131,6 +1209,15 @@ body::before {
 }
 
 /* ---------------- motion preferences ---------------- */
+
+/* phones pay for every blurred pixel; a shallower blur reads the same at this size */
+@media (max-width: 640px) {
+  .card,
+  .statusbar {
+    backdrop-filter: blur(6px) saturate(108%);
+    -webkit-backdrop-filter: blur(6px) saturate(108%);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,

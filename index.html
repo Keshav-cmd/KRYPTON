@@ -3,10 +3,27 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="theme-color" content="#111318" />
+<meta name="theme-color" content="#0B0D12" />
+<link rel="icon" href="assets/logo/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="32x32" href="assets/logo/icon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="assets/logo/icon-16.png" />
+<link rel="apple-touch-icon" href="assets/logo/icon-180.png" />
+<link rel="manifest" href="site.webmanifest" />
 <meta name="author" content="Keshav Jha" />
 <title>KRYPTØN — Chess against five AI minds</title>
 <meta name="description" content="KRYPTØN — a complete chess game against five AI bots: NOX, DEEPNIGHT, AXIOM, CAISSA and NEMESIS. By Keshav Jha." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="KRYPTØN" />
+<meta property="og:title" content="KRYPTØN — Chess against five AI minds" />
+<meta property="og:description" content="Free AI chess game: five engines from 450 to 1900 Elo, written from scratch in JavaScript. Play online or install the Android APK." />
+<meta property="og:url" content="https://keshav-cmd.github.io/KRYPTON/" />
+<meta property="og:image" content="https://keshav-cmd.github.io/KRYPTON/assets/poster.png" />
+<meta property="og:image:width" content="1600" />
+<meta property="og:image:height" content="900" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="KRYPTØN — Chess against five AI minds" />
+<meta name="twitter:description" content="Five AI chess engines, 450–1900 Elo, built from scratch in JavaScript. No sign-up, works offline." />
+<meta name="twitter:image" content="https://keshav-cmd.github.io/KRYPTON/assets/poster.png" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -69,7 +86,10 @@
       </section>
 
       <section class="card">
-        <div class="card-head"><h2>You play</h2></div>
+        <div class="card-head">
+          <h2>You play</h2>
+          <span class="chip chip-rating" id="ratingChip" data-tip="Your rating — it moves with every result">—</span>
+        </div>
         <div class="segmented" id="colorPick" role="group" aria-label="Choose your colour">
           <button class="seg" data-color="w">White</button>
           <button class="seg" data-color="b">Black</button>
@@ -82,12 +102,14 @@
           <button class="btn" id="flipBtn">Flip board</button>
           <button class="btn btn-danger" id="resignBtn">Resign</button>
           <button class="btn" id="pgnBtn">Copy PGN</button>
+          <button class="btn btn-install" id="installBtn" hidden>Install app</button>
         </div>
       </section>
 
       <section class="card card-moves">
         <div class="card-head">
           <h2>Moves</h2>
+          <span class="chip chip-review" id="reviewChip" hidden></span>
           <span class="chip" id="moveCount">0</span>
         </div>
         <div class="movelist" id="movelist"><p class="empty">No moves yet — make the first one.</p></div>
@@ -106,13 +128,13 @@
       <span class="credit-mark" aria-hidden="true"></span>
       Created by <b>Keshav Jha</b>
     </span>
-    <span class="footer-note">KRYPTØN · five AI minds</span>
+    <span class="footer-note">KRYPTØN · five AI minds · v1.1.2</span>
   </footer>
 </div>
 
 <script src="js/engine.js"></script>
 <script src="js/ai.js"></script>
+<script src="js/engine-client.js"></script>
 <script src="js/app.js"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5c1216f0c233292',t:'MTc5NDk0MzYyMw=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5c1216f0c233292',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
