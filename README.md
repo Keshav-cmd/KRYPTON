@@ -13,7 +13,7 @@
 [![Built with](https://img.shields.io/badge/built_with-HTML_%2B_CSS_%2B_JS-A78BFA?style=flat-square&labelColor=0B0D12)](js/)
 [![No dependencies](https://img.shields.io/badge/dependencies-zero-9299A9?style=flat-square&labelColor=0B0D12)](#how-the-engine-thinks)
 
-[**Play now**](https://keshav-cmd.github.io/KRYPTON/) · [Download the APK](https://github.com/Keshav-cmd/KRYPTON/raw/refs/heads/main/app/KRYPT%C3%.apk) · [Screenshots](#screenshots) · [How it works](#how-the-engine-thinks)
+[**Play now**](https://keshav-cmd.github.io/KRYPTON/) · [Download the APK](https://github.com/Keshav-cmd/KRYPTON/raw/refs/heads/main/app/KRYPT%C3%98N.apk) · [Screenshots](#screenshots) · [How it works](#how-the-engine-thinks)
 
 </div>
 
