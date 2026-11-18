@@ -31,6 +31,8 @@
   var reviewNum = $('reviewNum');
   var moveCount = $('moveCount');
   var colorPick = $('colorPick');
+  var reviewChip = $('reviewChip');
+  var ratingChip = $('ratingChip');
 
   /* ---------- state ---------- */
   var state = {
@@ -38,6 +40,9 @@
     moves: [],
     ply: 0,
     level: 'club',
+    fen0: Chess.START_FEN,
+    review: null,          /* per-ply deltas from the post-game analysis */
+    reviewBusy: false,
     colorChoice: 'w',
     playerColor: 'w',
     aiColor: 'b',
@@ -284,12 +289,22 @@
     if (st.inCheck && ksq >= 0) addCls(ksq, 'check');
   }
 
+  var moveListKey = '';   /* what the current DOM was built from */
+
   function renderMoveList() {
     if (!state.moves.length) {
-      movelistEl.innerHTML = '<p class="empty">No moves yet — make the first one.</p>';
+      if (moveListKey !== '') { movelistEl.innerHTML = '<p class="empty">No moves yet — make the first one.</p>'; moveListKey = ''; }
       moveCount.textContent = '0';
       return;
     }
+
+    /* Rebuilding the whole list costs ~13 ms per move on a throttled phone, and
+       render() runs on every selection. Only rebuild when the game or the review
+       actually changed; otherwise it is just two class toggles. */
+    var key = state.moves.length + ':' + (state.review ? state.review.length : 0);
+    if (key === moveListKey) { paintMoveList(); return; }
+    moveListKey = key;
+
     var html = '';
     var rows = [];
     for (var i = 0; i < state.moves.length; i += 2) {
@@ -302,16 +317,35 @@
     }
     movelistEl.innerHTML = rows.join('');
     moveCount.textContent = String(state.moves.length);
+    var fresh = movelistEl.querySelectorAll('.move-san');
+    for (var k = 0; k < fresh.length; k++) {
+      fresh[k].addEventListener('click', (function (p) {
+        return function () { gotoPly(Number(p)); };
+      })(fresh[k].dataset.ply));
+    }
+    paintMoveList();
+    movelistEl.scrollTop = movelistEl.scrollHeight;
+  }
+
+  /* current / dim marks + review tags: cheap enough to run on every render */
+  function paintMoveList() {
     var els = movelistEl.querySelectorAll('.move-san');
     for (var j = 0; j < els.length; j++) {
       var ply = Number(els[j].dataset.ply);
       if (ply === state.ply) els[j].classList.add('current');
       else if (ply > state.ply) els[j].classList.add('dim');
-      els[j].addEventListener('click', (function (p) {
-        return function () { gotoPly(p); };
-      })(ply));
+
+      /* post-game marks, for the player's own moves only */
+      if (state.review && state.review[ply - 1] && moverOf(ply) === state.playerColor) {
+        var an = state.review[ply - 1];
+        var tag = tagFor(an.delta, ply);
+        if (tag) {
+          els[j].classList.add(tag);
+          var where = an.bestSan ? ' — best was ' + an.bestSan : '';
+          els[j].setAttribute('data-tip', 'lost ' + pawns(an.delta) + where);
+        }
+      }
     }
-    movelistEl.scrollTop = movelistEl.scrollHeight;
   }
 
   function renderCaptures() {
@@ -380,7 +414,7 @@
   function renderEval(pos) {
     var cp = AI.quickEval(pos);
     var p = 1 / (1 + Math.exp(-0.004 * cp));
-    evalFill.style.height = (p * 100).toFixed(1) + '%';
+    evalFill.style.transform = 'scaleY(' + p.toFixed(4) + ')';   /* composite, not layout */
     var pawns = cp / 100;
     evalNum.textContent = (pawns > 0 ? '+' : '') + pawns.toFixed(1);
   }
@@ -524,6 +558,7 @@
     state.ply = state.positions.length - 1;
     state.lastMove = { from: mv.from, to: mv.to };
     state.hint = null;
+    saveGame();
     /* clear stale read-outs when *we* move, but keep the bot's search summary
        (depth / nodes) visible right after it replies */
     if (Chess.isWhitePiece(mv.piece) === (state.playerColor === 'w')) engineInfo.textContent = '';
@@ -552,7 +587,7 @@
     setTimeout(function () {
       if (gen !== state.generation) return;
       var pos = currentPos();
-      AI.findBestMove(pos, state.level, {
+      Engine.findBestMove(pos, state.level, {
         onProgress: function (info) {
           if (gen !== state.generation) return;
           engineInfo.textContent = 'depth ' + info.depth + ' · ' + formatNodes(info.nodes) + ' nodes';
@@ -575,6 +610,7 @@
 
   /* ---------- game over ---------- */
   function finishGame(st) {
+    clearSave();                    /* a finished game is not offered back on reload */
     state.over = true;
     state.thinking = false;
     state.result = st.result;
@@ -592,6 +628,15 @@
       state.resultText = levelCfg().name + ' wins — ' + st.reason.toLowerCase();
       Sound.lose();
     }
+
+    /* rating moves on every finished game, including resignations */
+    var score = draw ? 0.5 : (playerWon ? 1 : 0);
+    var moved = applyResult(score, levelCfg().elo);
+    if (moved) {
+      state.ratingDelta = moved;
+      toast('Rating ' + loadRating().elo + ' (' + (moved > 0 ? '+' : '') + moved + ')');
+    }
+
     render();
 
     var title = draw ? 'Draw' : (playerWon ? 'Victory!' : 'Defeat');
@@ -613,6 +658,9 @@
 
     $('rematchBtn').addEventListener('click', function () { closeModal(); newGame(); });
     $('reviewBtn').addEventListener('click', function () { closeModal(); });
+
+    /* score the game while the player reads the result */
+    startReview();
   }
 
   function closeModal() { modalLayer.hidden = true; modalLayer.innerHTML = ''; }
@@ -660,6 +708,292 @@
     }
   }
 
+  /* ---------- adaptive rating ----------
+     A local Elo estimate. Every finished game is scored against the bot's own
+     rating with the standard Elo formula, so beating NEMESIS moves it five times
+     as far as beating NOX. Nothing leaves the device — it is one number in
+     localStorage, no account, no server. */
+
+  var RATING_KEY = 'krypton.rating.v1';
+  var RATING_START = 800;   /* a beginner who knows the rules */
+  var RATING_K_NEW = 40;    /* provisional: converge fast for the first games */
+  var RATING_K = 20;
+  var RATING_PROVISIONAL = 10;
+
+  function loadRating() {
+    var out = { elo: RATING_START, games: 0, best: RATING_START };
+    try {
+      var raw = window.localStorage.getItem(RATING_KEY);
+      if (!raw) return out;
+      var saved = JSON.parse(raw);
+      if (saved && isFinite(saved.elo)) {
+        out.elo = Math.round(saved.elo);
+        out.games = saved.games || 0;
+        out.best = Math.max(saved.best || 0, out.elo);
+      }
+    } catch (e) { /* storage blocked: fall back to the starting rating */ }
+    return out;
+  }
+
+  function storeRating(r) {
+    try { window.localStorage.setItem(RATING_KEY, JSON.stringify(r)); } catch (e) { /* ignore */ }
+  }
+
+  function expectedScore(mine, theirs) {
+    return 1 / (1 + Math.pow(10, (theirs - mine) / 400));
+  }
+
+  /* score: 1 win, 0.5 draw, 0 loss. Returns the delta, or null if unusable. */
+  function applyResult(score, oppElo) {
+    var r = loadRating();
+    var k = r.games < RATING_PROVISIONAL ? RATING_K_NEW : RATING_K;
+    var delta = Math.round(k * (score - expectedScore(r.elo, oppElo)));
+    if (!isFinite(delta) || delta === 0) return 0;
+
+    r.elo = Math.max(100, r.elo + delta);
+    r.games += 1;
+    r.best = Math.max(r.best, r.elo);
+    storeRating(r);
+    renderRating(delta);
+    return delta;
+  }
+
+  function renderRating(delta) {
+    if (!ratingChip) return;
+    var r = loadRating();
+    ratingChip.textContent = r.elo;
+
+    var tip = 'Your rating · ' + r.games + (r.games === 1 ? ' game' : ' games');
+    if (r.games) tip += ' · best ' + r.best;
+    if (r.games < RATING_PROVISIONAL) tip += ' · provisional';
+    ratingChip.setAttribute('data-tip', tip);
+
+    ratingChip.classList.remove('flash-up', 'flash-down');
+    if (delta) {
+      /* restart the animation */
+      void ratingChip.offsetWidth;
+      ratingChip.classList.add(delta > 0 ? 'flash-up' : 'flash-down');
+    }
+    markMatchedLevel();
+  }
+
+  /* the closest opponent gets a gold pip — a suggestion, never an automatic switch */
+  function markMatchedLevel() {
+    var elo = loadRating().elo;
+    var bestIndex = 0, bestGap = Infinity;
+    for (var i = 0; i < AI.LEVELS.length; i++) {
+      var gap = Math.abs(AI.LEVELS[i].elo - elo);
+      if (gap < bestGap) { bestGap = gap; bestIndex = i; }
+    }
+    var kids = levelsEl.children;
+    for (var j = 0; j < kids.length; j++) {
+      var eloEl = kids[j].querySelector('.level-elo');
+      if (eloEl) eloEl.classList.toggle('matched', j === bestIndex);
+    }
+  }
+
+  /* ---------- post-game review ----------
+     After the game ends the worker replays it and scores every move against the
+     engine's own choice. We only surface it for the human's moves. */
+
+  var REVIEW_BLUNDER = 150;   /* centipawns */
+  var REVIEW_MISTAKE = 80;
+  var REVIEW_INACCURACY = 40;
+
+  function moverOf(ply) { return ply % 2 === 1 ? 'w' : 'b'; }
+
+  function tagFor(delta, ply) {
+    var played = state.moves[ply - 1];
+    var analysed = state.review[ply - 1];
+    if (analysed && analysed.best && played) {
+      var a = played.mv, b = analysed.best;
+      if (a.from === b.from && a.to === b.to && (a.promo || null) === (b.promo || null)) return '';
+    }
+    if (delta >= REVIEW_BLUNDER) return 'blunder';
+    if (delta >= REVIEW_MISTAKE) return 'mistake';
+    if (delta >= REVIEW_INACCURACY) return 'inaccuracy';
+    return '';
+  }
+
+  function pawns(cp) { return (cp / 100).toFixed(1); }
+
+  function startReview() {
+    if (!state.moves.length || state.review || state.reviewBusy) return;
+
+    var gen = state.generation;
+    var fen = state.fen0;
+    var moves = state.moves.map(function (x) {
+      return { from: x.mv.from, to: x.mv.to, promo: x.mv.promo || null };
+    });
+
+    state.reviewBusy = true;
+    renderReviewChip();
+
+    Engine.review(fen, moves, {
+      only: state.playerColor,
+      onProgress: function (p) {
+        if (gen !== state.generation) return;
+        renderReviewChip(p);
+      }
+    }).then(function (plies) {
+      if (gen !== state.generation) return;
+      state.reviewBusy = false;
+      state.review = plies && plies.length ? plies : null;
+      moveListKey = '';              /* the marks changed: force a rebuild */
+      renderMoveList();
+      renderReviewChip();
+    });
+  }
+
+  function renderReviewChip(progress) {
+    if (!reviewChip) return;
+
+    if (state.reviewBusy) {
+      var done = progress && progress.done ? progress.done : 0;
+      var total = progress && progress.total ? progress.total : state.moves.length;
+      reviewChip.hidden = false;
+      reviewChip.textContent = 'analysing ' + done + '/' + total;
+      reviewChip.removeAttribute('data-tip');
+      return;
+    }
+
+    if (!state.review) { reviewChip.hidden = true; reviewChip.textContent = ''; return; }
+
+    var mine = 0, sum = 0, blunders = 0, mistakes = 0;
+    for (var i = 0; i < state.review.length; i++) {
+      var r = state.review[i];
+      if (moverOf(r.ply) !== state.playerColor) continue;
+      mine++;
+      sum += r.delta;
+      var tag = tagFor(r.delta, r.ply);
+      if (tag === 'blunder') blunders++;
+      else if (tag === 'mistake') mistakes++;
+    }
+
+    if (!mine) { reviewChip.hidden = true; return; }
+    var acpl = Math.round(sum / mine);
+    var bits = ['ACPL ' + acpl];
+    if (blunders) bits.push(blunders + ' blunder' + (blunders === 1 ? '' : 's'));
+    else if (mistakes) bits.push(mistakes + ' mistake' + (mistakes === 1 ? '' : 's'));
+    else bits.push('clean game');
+
+    reviewChip.hidden = false;
+    reviewChip.textContent = bits.join(' · ');
+    reviewChip.setAttribute('data-tip',
+      'Average centipawn loss over your ' + mine + (mine === 1 ? ' move' : ' moves') +
+      ' — lower is better');
+  }
+
+  /* ---------- save & resume ----------
+     A game is only a start FEN plus the moves played, so it fits in a few hundred
+     bytes of localStorage. Restoring replays them through the real rules: a stale
+     or tampered save can never produce an illegal position, it is just discarded. */
+
+  var SAVE_KEY = 'krypton.save.v1';
+
+  function gameStore() {
+    try { return window.localStorage; } catch (e) { return null; }   /* private mode / blocked */
+  }
+
+  function uciOf(mv) { return { from: mv.from, to: mv.to, promo: mv.promo || null }; }
+
+  function findLegalByUci(pos, u) {
+    var legal = Chess.legalMoves(pos);
+    for (var i = 0; i < legal.length; i++) {
+      var m = legal[i];
+      if (m.from === u.from && m.to === u.to && (m.promo || null) === (u.promo || null)) return m;
+    }
+    return null;
+  }
+
+  function clearSave() {
+    var store = gameStore();
+    if (!store) return;
+    try { store.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+  }
+
+  function saveGame() {
+    var store = gameStore();
+    if (!store) return;
+    /* nothing worth resuming: an untouched board or a finished game */
+    if (!state.moves.length || state.over) { clearSave(); return; }
+    try {
+      store.setItem(SAVE_KEY, JSON.stringify({
+        v: 1,
+        fen: state.fen0,
+        moves: state.moves.map(function (x) { return uciOf(x.mv); }),
+        level: state.level,
+        colorChoice: state.colorChoice,
+        playerColor: state.playerColor,
+        flipped: state.flipped
+      }));
+    } catch (e) { /* quota exceeded or storage disabled — never break play over it */ }
+  }
+
+  function resumeGame(intent) {
+    intent = intent || {};
+    var store = gameStore();
+    if (!store) return false;
+
+    var raw = null;
+    try { raw = store.getItem(SAVE_KEY); } catch (e) { return false; }
+    if (!raw) return false;
+
+    var save = null;
+    try { save = JSON.parse(raw); } catch (e) { clearSave(); return false; }
+    if (!save || save.v !== 1 || !save.moves || !save.moves.length) { clearSave(); return false; }
+
+    /* A link that asks for a different setup wins over the save: an explicit FEN
+       always starts fresh, and a level/colour that differs from the saved game
+       means "set this up", not "carry on". Re-loading the same URL resumes. */
+    if (intent.fen) return false;
+    if (intent.level && intent.level !== save.level) return false;
+    if (intent.color && intent.color !== save.colorChoice) return false;
+
+    var positions, moves;
+    try {
+      var pos = new Chess.Position(save.fen || Chess.START_FEN);
+      positions = [pos];
+      moves = [];
+      for (var i = 0; i < save.moves.length; i++) {
+        var mv = findLegalByUci(pos, save.moves[i]);
+        if (!mv) { clearSave(); return false; }          /* corrupt → start fresh */
+        var san = Chess.toSAN(pos, mv);
+        var next = pos.clone();
+        Chess.makeMove(next, mv);
+        positions.push(next);
+        moves.push({ san: san, mv: mv });
+        pos = next;
+      }
+    } catch (e) { clearSave(); return false; }
+
+    state.level = AI.getLevel(save.level || state.level).id;
+    state.colorChoice = save.colorChoice || 'w';
+    state.playerColor = save.playerColor === 'b' ? 'b' : 'w';
+    state.aiColor = other(state.playerColor);
+    state.flipped = !!save.flipped;
+    state.fen0 = save.fen || Chess.START_FEN;
+    state.positions = positions;
+    state.moves = moves;
+    state.ply = positions.length - 1;
+    var last = moves[moves.length - 1].mv;
+    state.lastMove = { from: last.from, to: last.to };
+    state.over = false;
+    state.thinking = false;
+    state.hint = null;
+    state.selected = null;
+    state.targets = [];
+    return true;
+  }
+
+  /* the DOM half of "rebuild the board from scratch", shared by newGame + resume */
+  function rebuildBoardDom() {
+    buildSquares();
+    pieceMap.forEach(function (r) { if (r.el.parentNode) r.el.parentNode.removeChild(r.el); });
+    pieceMap.clear();
+    piecesEl.innerHTML = '';
+  }
+
   /* ---------- new game / controls ---------- */
   function urlParams() {
     try { return new URLSearchParams(window.location.search); } catch (e) { return null; }
@@ -672,7 +1006,12 @@
 
   function newGame() {
     state.generation++;
-    state.positions = [new Chess.Position(startFen())];
+    Engine.cancel();
+    state.fen0 = startFen();
+    state.review = null;
+    state.reviewBusy = false;
+    moveListKey = '';
+    state.positions = [new Chess.Position(state.fen0)];
     state.moves = [];
     state.ply = 0;
     state.over = false;
@@ -694,15 +1033,13 @@
     state.aiColor = other(state.playerColor);
     /* orient the board to the player */
     state.flipped = (state.playerColor === 'b');
-    buildSquares();
-
-    pieceMap.forEach(function (r) { if (r.el.parentNode) r.el.parentNode.removeChild(r.el); });
-    pieceMap.clear();
-    piecesEl.innerHTML = '';
+    rebuildBoardDom();
 
     render();
     updateReviewBar();
     engineInfo.textContent = '';
+    renderReviewChip();
+    saveGame();                     /* clears the slot: a fresh board is nothing to resume */
 
     if (currentPos().turn === state.aiColor) scheduleAI();
   }
@@ -710,6 +1047,7 @@
   function undoMove() {
     if (!state.moves.length || state.thinking) return;
     state.generation++;
+    Engine.cancel();
     /* Take back a full round: if it's our turn, remove the bot reply + our
        last move (2 plies); if the bot is to move (we just played), remove 1. */
     var toMove = state.positions[state.positions.length - 1].turn;
@@ -730,12 +1068,11 @@
     closeModal();
 
     /* rebuild the board from the restored position */
-    pieceMap.forEach(function (r) { if (r.el.parentNode) r.el.parentNode.removeChild(r.el); });
-    pieceMap.clear();
-    piecesEl.innerHTML = '';
+    rebuildBoardDom();
 
     render();
     updateReviewBar();
+    saveGame();
     if (!state.over && currentPos().turn === state.aiColor) scheduleAI();
   }
 
@@ -744,7 +1081,7 @@
     var pos = currentPos();
     var gen = state.generation, atPly = state.ply;
     engineInfo.textContent = 'analysing…';
-    AI.findBestMove(pos, 'expert', { noBlunder: true, exact: true }).then(function (res) {
+    Engine.findBestMove(pos, 'expert', { noBlunder: true, exact: true }).then(function (res) {
       /* the board may have moved on while we were thinking */
       if (!res || gen !== state.generation || state.ply !== atPly) return;
       state.hint = { from: res.move.from, to: res.move.to };
@@ -840,6 +1177,7 @@
       levelsEl.appendChild(btn);
     });
     updateLevelInfo();
+    markMatchedLevel();
   }
 
   function selectLevel(id) {
@@ -877,6 +1215,81 @@
     }
   });
 
+  /* ---------- installable app (service worker + install prompt) ---------- */
+
+  var installBtn = $('installBtn');
+  var deferredPrompt = null;
+
+  function isStandalone() {
+    try {
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (window.navigator.standalone) return true;          /* iOS */
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+
+  function isIOS() {
+    var ua = navigator.userAgent || '';
+    return /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function showInstall() {
+    if (!installBtn || isStandalone()) return;
+    installBtn.hidden = false;
+  }
+
+  function setupInstall() {
+    if (!installBtn) return;
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();                                    /* keep our own button */
+      deferredPrompt = e;
+      showInstall();
+    });
+
+    window.addEventListener('appinstalled', function () {
+      deferredPrompt = null;
+      installBtn.hidden = true;
+      toast('Installed — KRYPTØN now opens like an app');
+    });
+
+    /* iOS never fires beforeinstallprompt, so offer the manual route instead */
+    if (isIOS() && !isStandalone()) showInstall();
+
+    installBtn.addEventListener('click', function () {
+      if (deferredPrompt) {
+        var p = deferredPrompt;
+        deferredPrompt = null;
+        p.prompt();
+        installBtn.hidden = true;
+        return;
+      }
+      if (isIOS()) {
+        toast('Tap Share, then “Add to Home Screen”');
+        return;
+      }
+      toast('Use your browser menu → Install app');
+    });
+  }
+
+  function setupServiceWorker() {
+    if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      /* a new build is sitting in the wings: offer a one-click refresh */
+      reg.addEventListener('updatefound', function () {
+        var fresh = reg.installing;
+        if (!fresh) return;
+        fresh.addEventListener('statechange', function () {
+          if (fresh.state === 'installed' && navigator.serviceWorker.controller) {
+            toast('Update ready — reopen to load it');
+          }
+        });
+      });
+    }).catch(function () { /* private mode, unsupported, or blocked: the game still works */ });
+  }
+
   /* ---------- buttons ---------- */
   $('newGameBtn').addEventListener('click', function () { newGame(); });
   $('undoBtn').addEventListener('click', function () { undoMove(); });
@@ -885,6 +1298,7 @@
   $('resignBtn').addEventListener('click', function () {
     if (state.over) return;
     state.generation++;
+    Engine.cancel();
     var winner = other(state.playerColor);
     finishGame({ over: true, result: winner === 'w' ? '1-0' : '0-1', reason: 'Resignation' });
   });
@@ -931,14 +1345,40 @@
     }
 
     var kids = colorPick.querySelectorAll('.seg');
-    for (var i = 0; i < kids.length; i++) kids[i].classList.toggle('active', kids[i].dataset.color === state.colorChoice);
-    newGame();
+
+    var intent = {
+      fen: (p && p.get('fen')) || null,
+      level: (p && p.get('level')) ? AI.getLevel(p.get('level')).id : null,
+      color: (p && (p.get('color') === 'w' || p.get('color') === 'b' || p.get('color') === 'r')) ? p.get('color') : null
+    };
+
+    if (resumeGame(intent)) {
+      for (var j = 0; j < kids.length; j++) kids[j].classList.toggle('active', kids[j].dataset.color === state.colorChoice);
+      rebuildBoardDom();
+      /* highlight the saved opponent without the "takes over" toast */
+      state.level = AI.getLevel(state.level).id;
+      var rows = levelsEl.children;
+      for (var r = 0; r < rows.length; r++) rows[r].classList.toggle('active', AI.LEVELS[r].id === state.level);
+      updateLevelInfo();
+      render();
+      updateReviewBar();
+      engineInfo.textContent = '';
+      toast('Game restored — ' + state.moves.length + ' moves in');
+      if (currentPos().turn === state.aiColor) scheduleAI();
+    } else {
+      for (var k = 0; k < kids.length; k++) kids[k].classList.toggle('active', kids[k].dataset.color === state.colorChoice);
+      newGame();
+    }
 
     if (window.ResizeObserver) {
       new ResizeObserver(sizeBoard).observe(boardEl);
     } else {
       window.addEventListener('resize', sizeBoard);
     }
+
+    renderRating(0);
+    setupInstall();
+    setupServiceWorker();
   }
 
   init();
